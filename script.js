@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         DK Mega-Balíček by HumSterCZ
 // @namespace    https://github.com/HumSterCZ/dk-scripts
-// @version      8.2
-// @description  Komplexní automatizace a UI vylepšení pro Divoké kmeny. Centralizovaný ovládací panel.
+// @version      8.5
+// @description  Komplexní automatizace a UI vylepšení pro Divoké kmeny. Centralizovaný panel + nové komunitní funkce.
 // @author       HumSterCZ
 // @license      MIT
 // @match        https://*.divokekmeny.cz/game.php?*
@@ -12,9 +12,9 @@
 
 /*
  * -----------------------------------------------------------------------------
- *  Název: DK Mega-Balíček All-in-One (Centralized UI)
+ *  Název: DK Mega-Balíček All-in-One (Pro Edition)
  *  Autor: HumSterCZ
- *  Verze: 8.2
+ *  Verze: 8.5
  * -----------------------------------------------------------------------------
  *  MIT License
  *  
@@ -36,28 +36,58 @@
     let oldModal = document.getElementById('dk-readme-modal');
     if (oldModal) oldModal.remove();
 
-    // 2. Inicializace proměnných a stylů tlačítek pro panel
+    // 2. Inicializace proměnných pro zjištění aktuální obrazovky
     const urlParams = new URLSearchParams(window.location.search);
     const screen = urlParams.get('screen');
     const mode = urlParams.get('mode');
     const tryConfirm = urlParams.get('try');
     
+    const isPlace = (screen === 'place' && !tryConfirm);
+    const isFarm = (screen === 'am_farm');
+
+    // Styly tlačítek akcí
     const btnStyle = "background:#4caf50; color:white; border:1px solid #388e3c; padding:6px; cursor:pointer; border-radius:3px; font-weight:bold; width:100%; box-sizing:border-box; text-align:center;";
     const btnStyleBlue = "background:#3f51b5; color:white; border:1px solid #303f9f; padding:6px; cursor:pointer; border-radius:3px; font-weight:bold; width:100%; box-sizing:border-box; text-align:center;";
     const btnStyleOrange = "background:#ff9800; color:white; border:1px solid #e65100; padding:6px; cursor:pointer; border-radius:3px; font-weight:bold; width:100%; box-sizing:border-box; text-align:center;";
     const btnStyleRed = "background:#f44336; color:white; border:1px solid #d32f2f; padding:6px; cursor:pointer; border-radius:3px; font-weight:bold; width:100%; box-sizing:border-box; text-align:center;";
 
-    // 3. Vytvoření hlavního panelu do DOMu (přidána sekce pro tlačítka)
+    // Styly pro vizuální zkratky (štítky)
+    const activeNav = "display:inline-block; background:#3f51b5; color:white; padding:3px 6px; border-radius:3px; margin:2px; font-weight:bold; font-size:10px; box-shadow:1px 1px 2px rgba(0,0,0,0.3);";
+    const activeKey = "display:inline-block; background:#4caf50; color:white; padding:3px 6px; border-radius:3px; margin:2px; font-weight:bold; font-size:10px; box-shadow:1px 1px 2px rgba(0,0,0,0.3);";
+    const inactiveKey = "display:inline-block; background:#d3d3d3; color:#777; padding:3px 6px; border-radius:3px; margin:2px; font-weight:bold; font-size:10px; border:1px solid #aaa;";
+
+    // 3. Vytvoření hlavního panelu do DOMu
     let panel = document.createElement('div');
     panel.id = 'dk-help-panel';
     panel.innerHTML = `
-        <div style="position:fixed; top:60px; left:10px; background:#fdf2e3; border:2px solid #804000; padding:12px; z-index:10000; border-radius:5px; box-shadow:3px 3px 8px rgba(0,0,0,0.6); font-family:Verdana,Arial,sans-serif; font-size:12px; color:black; width:260px;">
-            <h4 style="margin:0 0 8px 0; border-bottom:1px solid #804000; padding-bottom:5px; color:#804000;">HumSterCZ Nástroj v8.2</h4>
-            <div style="margin-bottom:5px; font-weight:bold;">Aktivní na této stránce:</div>
-            <ul id="dk-active-list" style="margin:0 0 10px 0; padding-left:20px; line-height:1.6; color:#444;"></ul>
+        <div style="position:fixed; top:60px; left:10px; background:#fdf2e3; border:2px solid #804000; padding:12px; z-index:10000; border-radius:5px; box-shadow:3px 3px 8px rgba(0,0,0,0.6); font-family:Verdana,Arial,sans-serif; font-size:12px; color:black; width:280px;">
+            <h4 style="margin:0 0 8px 0; border-bottom:1px solid #804000; padding-bottom:5px; color:#804000;">HumSterCZ Nástroj v8.5</h4>
+            <div style="margin-bottom:5px; font-weight:bold;">Běžící procesy:</div>
+            <ul id="dk-active-list" style="margin:0 0 5px 0; padding-left:20px; line-height:1.6; color:#444;"></ul>
             
             <div id="dk-action-container" style="display:flex; flex-direction:column; gap:8px; margin-bottom:10px; border-top:1px solid #804000; padding-top:10px;"></div>
             
+            <div id="dk-hotkeys-container" style="border-top:1px solid #804000; padding-top:8px; margin-bottom:10px;">
+                <div style="font-weight:bold; margin-bottom:5px; color:#804000;">Klávesové zkratky:</div>
+                <div style="line-height:1.6;">
+                    <span style="${activeNav}" title="Náhled vesnice">[V] Vesnice</span>
+                    <span style="${activeNav}" title="Hlavní budova">[H] Hl. budova</span>
+                    <span style="${activeNav}" title="Nádvoří">[N] Nádvoří</span>
+                    <span style="${activeNav}" title="Rekrutace">[R] Rekrut</span>
+                    <span style="${activeNav}" title="Tržiště">[T] Trh</span>
+                    <span style="${activeNav}" title="Mapa">[M] Mapa</span>
+                </div>
+                <div style="line-height:1.6; margin-top:4px;">
+                    <span style="${isPlace ? activeKey : inactiveKey}">[F] Fake</span>
+                    <span style="${isPlace ? activeKey : inactiveKey}">[S] Špeh</span>
+                    <span style="${isPlace ? activeKey : inactiveKey}">[D] Def</span>
+                    <span style="${isPlace ? activeKey : inactiveKey}">[Q] Šlechta</span>
+                </div>
+                <div style="line-height:1.6; margin-top:4px;">
+                    <span style="${isFarm ? activeKey : inactiveKey}">[Mezerník] Farm Bot Start/Stop</span>
+                </div>
+            </div>
+
             <div style="display:flex; gap:5px; border-top:1px solid #804000; padding-top:10px;">
                 <button id="btn-readme" style="flex:1; background:#00bcd4; color:white; border:none; padding:8px 4px; cursor:pointer; border-radius:3px; font-weight:bold; box-shadow:1px 1px 3px rgba(0,0,0,0.4);">Read Me</button>
                 <button id="btn-close-help" style="flex:1; background:#f44336; color:white; border:none; padding:8px 4px; cursor:pointer; border-radius:3px; font-weight:bold; box-shadow:1px 1px 3px rgba(0,0,0,0.4);">Skrýt</button>
@@ -65,21 +95,21 @@
         </div>`;
     document.body.appendChild(panel);
 
-    // Pomocná funkce pro vkládání popisků do panelu
     function addActiveInfo(text) {
         $('#dk-active-list').append(`<li>${text}</li>`);
     }
 
-    // 4. Globální funkce (běží všude)
+    // 4. Globální funkce
     initStorageWatcher();
+    initSessionGuard();
     initGlobalHotkeys();
     addActiveInfo('Hlídač skladu (pozadí)');
+    addActiveInfo('Session Guard (Anti-AFK)');
     
-    // 5. Hlavní Router pro aktivaci nástrojů
-    if (screen === 'am_farm') {
+    // 5. Hlavní Router (načítání funkčních tlačítek do Action kontejneru)
+    if (isFarm) {
         initFarmBot();
         addActiveInfo('Profi Farm Bot');
-        addActiveInfo('[Mezerník] = Start/Stop Bota');
     } else if (screen === 'place' && tryConfirm === 'confirm') {
         initAttackTimer();
         addActiveInfo('Časovač útoků / Snipe');
@@ -94,13 +124,14 @@
     } else if (screen === 'place' && mode === 'scavenge') {
         initScavenger();
         addActiveInfo('Rychlý Sběr');
-    } else if (screen === 'place' && !tryConfirm && mode !== 'scavenge') {
+    } else if (isPlace) {
         initEnhancedPlace();
         addActiveInfo('Rychlé vkládání vojsk');
-        addActiveInfo('[F]=Fake | [S]=Špeh | [D]=Def | [Q]=Šlechta');
     } else if (screen === 'main') {
         initBuilderHelper();
+        initQueueEstimator();
         addActiveInfo('Pomocník stavitele');
+        addActiveInfo('Kalkulátor fronty');
     } else if (screen === 'train') {
         initMassTrain();
         addActiveInfo('Hromadná rekrutace');
@@ -114,11 +145,10 @@
         initCoordinateExtractor();
         addActiveInfo('Extraktor souřadnic');
     } else {
-        // Pokud není na stránce žádná specifická akce, skryjeme prázdný action kontejner
         $('#dk-action-container').hide();
     }
 
-    // 6. UI: Zavírání a Otevírání oken
+    // 6. UI: Read Me okno
     document.getElementById('btn-close-help').addEventListener('click', () => panel.remove());
     document.getElementById('btn-readme').addEventListener('click', () => {
         if(document.getElementById('dk-readme-modal')) return;
@@ -129,40 +159,37 @@
             <div style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:10005; display:flex; justify-content:center; align-items:center;">
                 <div style="background:#fdf2e3; border:3px solid #804000; padding:20px; border-radius:8px; width:90%; max-width:800px; max-height:85vh; overflow-y:auto; box-shadow:0 0 20px rgba(0,0,0,1); font-family:Verdana,Arial,sans-serif; color:black;">
                     <h2 style="color:#804000; border-bottom:2px solid #804000; padding-bottom:10px; margin-top:0;">HumSterCZ Script - Dokumentace modulů</h2>
-                    <p style="font-size:13px; line-height:1.5;">Ovládání všech aktivních nástrojů se nachází v hlavním postranním panelu skriptu. Panel se dynamicky mění podle toho, na jaké stránce se zrovna nacházíš.</p>
+                    <p style="font-size:13px; line-height:1.5;">Ovládání všech aktivních nástrojů se nachází v hlavním postranním panelu skriptu. Panel se dynamicky mění podle toho, na jaké stránce se zrovna nacházíš. Zkratky se zabarvují podle aktuální dostupnosti.</p>
                     
+                    <h3 style="color:#3e2723; margin-bottom:5px;">Klávesové zkratky pro rychlou navigaci (Fungují všude):</h3>
+                    <ul style="font-size:13px; line-height:1.6; margin-top:0;">
+                        <li><strong>[V]</strong> = Náhled vesnice</li>
+                        <li><strong>[H]</strong> = Hlavní budova</li>
+                        <li><strong>[N]</strong> = Nádvoří</li>
+                        <li><strong>[R]</strong> = Rekrutace</li>
+                        <li><strong>[T]</strong> = Tržiště</li>
+                        <li><strong>[M]</strong> = Mapa</li>
+                    </ul>
+
                     <h3 style="color:#3e2723; margin-bottom:5px;">Kompletní seznam funkcí a jak fungují:</h3>
-                    
                     <ul style="font-size:13px; line-height:1.6; margin-top:0;">
                         <li><strong>Hlídač skladu (Všude):</strong> Běží trvale na pozadí. Automaticky obarví suroviny v horní liště na červeno, jakmile se tvůj sklad zaplní na více než 95 %.</li>
-                        
-                        <li><strong>Klávesové zkratky (Nádvoří):</strong> Umožňují rychlé ovládání bez myši. Stiskem [F] vložíš vojsko pro Fake, [S] pro 5 Špehů, [D] pro všechny obranné jednotky a [Q] pro Šlechtu.</li>
-                        
+                        <li><strong>Session Guard (Všude):</strong> Pravidelně udržuje aktivní spojení se serverem, čímž zabraňuje vypršení relace (Anti-AFK) při dlouhém čekání nebo farmení.</li>
+                        <li><strong>Klávesové zkratky (Nádvoří):</strong> Stiskem [F] vložíš vojsko pro Fake, [S] pro 5 Špehů, [D] pro všechny obranné jednotky a [Q] pro Šlechtu.</li>
                         <li><strong>Klávesové zkratky (Farm Bot):</strong> Stiskem [Mezerníku] v Pomocníkovi rabování bleskově zapneš nebo pozastavíš automatický běh Farm Bota.</li>
-                        
-                        <li><strong>Farm Bot (Pomocník rabování):</strong> V hlavním panelu nastavíš maximální vzdálenost. Po spuštění projíždí seznam vesnic a rozesílá A nebo B útoky. Zvládá sám překliknout na další stránku či vesnici, jakmile farma dojde.</li>
-                        
-                        <li><strong>Časovač útoků / Snipe (Nádvoří - Potvrzení):</strong> Do textových polí v panelu zadáš požadovaný čas a milisekundy dopadu. Skript nepřetržitě čte serverový čas a v přesně definovaný moment klikne na odeslat útok.</li>
-                        
-                        <li><strong>Detektor vláčků (Náhled - Příchozí):</strong> Automaticky projde tvé příchozí útoky. Pokud zjistí, že 3 a více útoků dopadá ve stejnou vteřinu, podbarví celou skupinu červeně a přidá varovný text [VLÁČEK].</li>
-                        
-                        <li><strong>Rychlé štítky (Náhled - Příchozí):</strong> Po kliknutí na tlačítko v panelu se u každého útoku objeví ikonky pro rychlé přejmenování (Šlechta, Beran, Sekera). Po kliknutí útok bleskově přejmenuje a uloží bez nutnosti načítání.</li>
-                        
-                        <li><strong>Profi Razič mincí (Panský dvůr):</strong> Po kliknutí na tlačítko v panelu najde skript odkaz pro vybrání maximálního počtu mincí a následně automaticky potvrdí jejich vyražení napříč tvým impériem.</li>
-                        
-                        <li><strong>Rychlý Sběr (Nádvoří - Sběr):</strong> Zmáčknutím tlačítka v panelu se vybere maximální množství volných jednotek a pošle se na průzkum do nejvyšší odemčené (volné) úrovně sběru.</li>
-                        
-                        <li><strong>Rychlé vkládání vojsk (Nádvoří):</strong> Obsahuje 4 tlačítka v panelu (Fake, Špeh, Obrana, Šlechta), která do formuláře pro odeslání rovnou předvyplní příslušné jednotky podle tvého výběru.</li>
-                        
-                        <li><strong>Pomocník stavitele (Hlavní budova):</strong> Zaškrtávací pole v hlavním panelu, které vizuálně skryje řádky budov, na které momentálně nemáš dostatek surovin. Přehlední to stavební frontu.</li>
-                        
-                        <li><strong>Hromadná rekrutace (Kasárna/Stáje/Dílna):</strong> Kliknutím v hlavním panelu skript automaticky rozpočítá dostupné suroviny do všech políček pro tvorbu jednotek a stiskne tlačítko rekrutovat.</li>
-                        
-                        <li><strong>Čistič oznámení (Oznámení):</strong> Tlačítko v panelu samočinně vyhledá a zaškrtne všechna oznámení označená zelenou tečkou (farma beze ztrát) a následně je odstraní.</li>
-                        
-                        <li><strong>Chytré Tržiště (Tržiště):</strong> Tlačítko v panelu zjistí počet tvých volných obchodníků a suroviny k odeslání do políček rozdělí přesně na rovnoměrné třetiny na základě jejich kapacity.</li>
-                        
-                        <li><strong>Extraktor souřadnic (Mapa/Fórum):</strong> Tlačítko v panelu proskenuje aktuální obrazovku, najde všechny vzory čísel formátu XXX|YYY, odstraní duplicitní záznamy a uloží ti čistý seznam do systémové schránky.</li>
+                        <li><strong>Farm Bot (Pomocník rabování):</strong> V hlavním panelu nastavíš maximální vzdálenost. Po spuštění projíždí seznam vesnic a rozesílá A nebo B útoky.</li>
+                        <li><strong>Časovač útoků / Snipe (Nádvoří - Potvrzení):</strong> Zadej požadovaný čas a milisekundy dopadu. Skript nepřetržitě čte serverový čas a v přesně definovaný moment klikne na odeslat.</li>
+                        <li><strong>Detektor vláčků (Náhled - Příchozí):</strong> Pokud zjistí, že 3 a více útoků dopadá ve stejnou vteřinu, podbarví celou skupinu červeně a přidá varovný text [VLÁČEK].</li>
+                        <li><strong>Rychlé štítky (Náhled - Příchozí):</strong> Po kliknutí na tlačítko v panelu se u každého útoku objeví tlačítka pro rychlé přejmenování (Šlechta, Beran, Sekera) bez načítání stránky.</li>
+                        <li><strong>Profi Razič mincí (Panský dvůr):</strong> Vyhledá odkaz pro vybrání maximálního počtu mincí a následně automaticky potvrdí jejich vyražení napříč tvým impériem.</li>
+                        <li><strong>Rychlý Sběr (Nádvoří - Sběr):</strong> Vybere maximální množství volných jednotek a pošle se na průzkum do nejvyšší odemčené úrovně sběru.</li>
+                        <li><strong>Rychlé vkládání vojsk (Nádvoří):</strong> Obsahuje 4 tlačítka v panelu (Fake, Špeh, Obrana, Šlechta), která do formuláře pro odeslání rovnou předvyplní příslušné jednotky.</li>
+                        <li><strong>Pomocník stavitele (Hlavní budova):</strong> Zaškrtávací pole v hlavním panelu, které vizuálně skryje řádky budov, na které momentálně nemáš dostatek surovin.</li>
+                        <li><strong>Kalkulátor fronty (Hlavní budova):</strong> Spočítá a v panelu zobrazí přesný čas v hodinách a minutách, kdy bude dokončena celá aktuální stavební fronta.</li>
+                        <li><strong>Hromadná rekrutace (Kasárna/Stáje/Dílna):</strong> Skript automaticky rozpočítá dostupné suroviny do všech políček pro tvorbu jednotek a stiskne tlačítko rekrutovat.</li>
+                        <li><strong>Čistič oznámení (Oznámení):</strong> Samočinně vyhledá a zaškrtne všechna oznámení označená zelenou tečkou (farma beze ztrát) a následně je odstraní.</li>
+                        <li><strong>Chytré Tržiště (Tržiště):</strong> Zjistí počet volných obchodníků a suroviny k odeslání rozdělí přesně na rovnoměrné třetiny na základě jejich kapacity.</li>
+                        <li><strong>Extraktor souřadnic (Mapa/Fórum):</strong> Proskenuje aktuální obrazovku, najde všechny vzory čísel formátu XXX|YYY, odstraní duplicitní záznamy a uloží ti čistý seznam do schránky.</li>
                     </ul>
                     
                     <button id="btn-close-readme" style="background:#f44336; color:white; border:none; padding:10px; cursor:pointer; border-radius:4px; font-weight:bold; width:100%; font-size:14px; margin-top:15px; box-shadow:0 4px 6px rgba(0,0,0,0.3);">Zavřít Dokumentaci</button>
@@ -175,19 +202,30 @@
     });
 
     // ==============================================================================
-    // CORE FUNKCE (Všechna tlačítka se nyní generují do #dk-action-container)
+    // CORE FUNKCE
     // ==============================================================================
 
     function initGlobalHotkeys() {
         document.addEventListener('keydown', function(e) {
             if(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-            if(screen === 'place' && !tryConfirm) {
+            
+            let base = window.game_data ? window.game_data.link_base_pure : null;
+            if (base) {
+                if(e.key.toLowerCase() === 'v') window.location.href = base + 'overview';
+                if(e.key.toLowerCase() === 'h') window.location.href = base + 'main';
+                if(e.key.toLowerCase() === 'n') window.location.href = base + 'place';
+                if(e.key.toLowerCase() === 'r') window.location.href = base + 'train';
+                if(e.key.toLowerCase() === 't') window.location.href = base + 'market';
+                if(e.key.toLowerCase() === 'm') window.location.href = base + 'map';
+            }
+
+            if(isPlace) {
                 if(e.key.toLowerCase() === 'f') $('#btn-fake').click();
                 if(e.key.toLowerCase() === 's') $('#btn-spy').click();
                 if(e.key.toLowerCase() === 'd') $('#btn-def').click();
                 if(e.key.toLowerCase() === 'q') $('#btn-snob').click();
             }
-            if(screen === 'am_farm') {
+            if(isFarm) {
                 if(e.code === 'Space') {
                     e.preventDefault(); 
                     let btnStart = $('#btn-start'), btnStop = $('#btn-stop');
@@ -196,6 +234,20 @@
                 }
             }
         });
+    }
+
+    function initSessionGuard() {
+        // Ochrana proti odhlášení při dlouhé nečinnosti (posílá tiché udržovací požadavky)
+        setInterval(() => {
+            if (typeof Timing !== 'undefined' && Timing.alive_timer) {
+                // Hra má vlastní heartbeat, tohle slouží jako pojistka pro obnovení tokenu
+                let pingUrl = window.game_data ? window.game_data.link_base_pure + 'overview' : null;
+                if(pingUrl && Math.random() < 0.1) {
+                    // Náhodný tichý dotaz na pozadí cca každých 10 minut
+                    $.get(pingUrl);
+                }
+            }
+        }, 60000);
     }
 
     function initCoordinateExtractor() {
@@ -255,10 +307,10 @@
 
     function initEnhancedPlace() { 
         $('#dk-action-container').append(`
-            <button id="btn-fake" style="${btnStyle}">Fake [F]</button>
-            <button id="btn-spy" style="${btnStyleBlue}">5 Špehů [S]</button>
-            <button id="btn-def" style="${btnStyle}">Vše do obrany [D]</button>
-            <button id="btn-snob" style="${btnStyleOrange}">Šlechta + Doprovod [Q]</button>
+            <button id="btn-fake" style="${btnStyle}">Fake (F)</button>
+            <button id="btn-spy" style="${btnStyleBlue}">5 Špehů (S)</button>
+            <button id="btn-def" style="${btnStyle}">Vše do obrany (D)</button>
+            <button id="btn-snob" style="${btnStyleOrange}">Šlechta + Doprovod (Q)</button>
         `);
         $('#btn-fake').click(function(e){ e.preventDefault(); $('#unit_input_ram, #unit_input_spy').val(1); }); 
         $('#btn-spy').click(function(e){ e.preventDefault(); $('#unit_input_spy').val(5); }); 
@@ -307,6 +359,24 @@
         $('#toggle-unavailable-bldgs').change(function(){ 
             if($(this).is(':checked')){ $('.cannot-build').hide(); } else { $('.cannot-build').show(); } 
         }); 
+    }
+
+    function initQueueEstimator() {
+        // Kalkulátor stavební fronty - spočítá celkový zbývající čas budov ve frontě
+        let totalSeconds = 0;
+        $('#build_order tr.command_row').each(function() {
+            let timeText = $(this).find('timer').text().trim();
+            let parts = timeText.split(':');
+            if(parts.length === 3) {
+                totalSeconds += parseInt(parts[0])*3600 + parseInt(parts[1])*60 + parseInt(parts[2]);
+            }
+        });
+        if(totalSeconds > 0) {
+            let hours = Math.floor(totalSeconds / 3600);
+            let minutes = Math.floor((totalSeconds % 3600) / 60);
+            let finishMessage = `Celkem zbývá: ${hours}h ${minutes}m`;
+            $('#dk-action-container').append(`<div style="background:#e3c485; border:1px solid #804000; border-radius:3px; padding:6px; text-align:center; font-weight:bold; font-size:11px;">${finishMessage}</div>`);
+        }
     }
 
     function initStorageWatcher() { 
